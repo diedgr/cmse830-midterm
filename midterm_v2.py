@@ -1,29 +1,33 @@
+# Import packages
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 
+# Import data
 csv_file_path = 'V-Dem-CPD-Party-V2.csv'
 data = pd.read_csv(csv_file_path)
 
-# Add a title to the app
+# Add a title, caption, and introductory paragraph
 st.title("Exploring the Positions and Ideologies of Political Parties")
-st.caption("Source: V-Party Dataset")
+st.caption("Source: [V-Party Dataset](https://www.v-dem.net/data/v-party-dataset/country-party-date-v2/)")
 st.write("This visualization presents time-series data of the ideological positions of major political parties from 178 countries. The data is sourced from the V-Party dataset, which includes assessments of party organization and identity as reflected by experts in political science.")
+st.write("Below, there are **two interactive visuals**. The first allows the user to view the political positions for parties for a given country, based on a key issue. The scoring system can be used to determine the meaning behind these position scores. The second visual outlines the position score in relation to the parties ideological position on the social and economic spectrum.")
 
 # Dictionary mapping variable names to user-friendly labels
 label_map = {
-    "v2paanteli": "Anti-elitism",
-    "v2papeople": "People-centrism",
-    "v2paopresp": "Political opponents",
-    "v2paplur": "Political pluralism",
-    "v2paminor": "Minority rights",
-    "v2paviol": "Rejection of political violence",
+    "v2paanteli": "Anti-Elitism",
+    "v2papeople": "People-Centrism",
+    "v2paopresp": "Political Opponents",
+    "v2paplur": "Political Pluralism",
+    "v2paminor": "Minority Rights",
+    "v2paviol": "Rejection of Political Violence",
     "v2paimmig": "Immigration",
-    "v2palgbt": "LGBT social equality",
-    "v2paculsup": "Cultural superiority",
-    "v2parelig": "Religious principles",
-    "v2pagender": "Gender equality",
-    "v2pawomlab": "Working women"
+    "v2palgbt": "LGBT Social Equality",
+    "v2paculsup": "Cultural Superiority",
+    "v2parelig": "Religious Principles",
+    "v2pagender": "Gender Equality",
+    "v2pawomlab": "Working Women"
 }
 
 # Function to format the select box display
@@ -43,14 +47,25 @@ filtered_data = data[data['country_name'] == country_name]
 
 # Create a line graph with Plotly
 party_options = filtered_data['v2paenname'].unique()
+
+# Filter the party options based on the filtered data
+filtered_party_options = filtered_data['v2paenname'].unique()
+
 party_colors = {party: px.colors.qualitative.Plotly[i % len(px.colors.qualitative.Plotly)] for i, party in enumerate(party_options)}
 fig = px.line(filtered_data, x='year', y=identity_score, color='v2paenname', color_discrete_map=party_colors, labels={'year': 'Year', identity_score: label_map[identity_score]})
-if identity_score == 'v2pariglef':
+if identity_score == 'v2pariglef_osp':
     fig.update_yaxes(title=label_map[identity_score])
 else:
     fig.update_yaxes(title=label_map[identity_score])
 
-fig.update_layout(title=f'Scores for Parties in {country_name}')
+# Set a custom range for the x-axis
+min_year = filtered_data['year'].min()
+max_year = filtered_data['year'].max()
+fig.update_layout(xaxis=dict(range=[min_year, max_year]))
+
+# Add subheader and introductory paragraph for graph
+st.header(f"Scores for Parties in {country_name}")
+st.write(f"This line graph examines party positions related to {label_map[identity_score].lower()} across time. To better interpret these scores, please use the question and coding boxes for more information.")
 
 # Remove the legend from the graph
 fig.update_traces(showlegend=False)
@@ -58,20 +73,16 @@ fig.update_traces(showlegend=False)
 # Display the line graph
 st.plotly_chart(fig)
 
-# Edit the trace box
-fig.update_traces(
-    hoverinfo='text',
-    hovertext=[f'Party Name: {name}' for name in filtered_data['v2paenname']]
-)
-
 # Set up the layout for the legend and additional information
 col1, col2 = st.columns([3, 3])
 
 # Display the legend in col1
 with col1:
     st.subheader("Legend")
-    for party, color in party_colors.items():
-        st.write(f"<div style='display: flex; align-items: center;'><div style='background-color: {color}; width: 20px; height: 10px; margin-right: 5px;'></div> {party}</div>", unsafe_allow_html=True)
+    for party in filtered_party_options:
+        color = party_colors[party]
+        if filtered_data[filtered_data['v2paenname'] == party][identity_score].notna().any():
+            st.write(f"<div style='display: flex; align-items: center;'><div style='background-color: {color}; width: 20px; height: 10px; margin-right: 5px;'></div> {party}</div>", unsafe_allow_html=True)
 
 # Dictionary mapping variable names to corresponding questions
 question_map = {
@@ -177,60 +188,81 @@ coding_map = {
     ],
 }
 
-# Additional Information display
+# Question and coding display
 with col2:
     st.subheader("Scoring System")
     if identity_score in label_map:
-        st.write(f"Question: {question_map[identity_score]}")
-        st.write("Responses:")
-        for rating in coding_map[identity_score]:
-            st.write(rating)
+        with st.expander("Question"):
+            st.write(question_map[identity_score])
+        with st.expander("Coding"):
+            for rating in coding_map[identity_score]:
+                st.write(rating)
 
-# New imports for 3D scatter plot
-import plotly.graph_objects as go
+# Title and introductory paragraph for 3D scatter plot
+st.markdown(f"<h2 style='padding-top: 20px;'><b>{label_map[identity_score]} on Political Spectrum</b></h2>", unsafe_allow_html=True)
+st.write(f"This interactive 3D scatter plot compares three contemporary variables: a party's economic ideology, social ideology, and {label_map[identity_score].lower()} position.")
 
-# New title for the 3D scatter plot
-st.subheader("3D Scatter Plot")
+# Define function to map integer scores to categories for economic position
+def map_economic_category(score):
+    if score < 1:
+        return "Far-Left"
+    elif score < 2:
+        return "Left"
+    elif score < 3:
+        return "Center-Left"
+    elif score < 4:
+        return "Center"
+    elif score < 5:
+        return "Center-Right"
+    elif score < 6:
+        return "Right"
+    else:
+        return "Far-Right"
 
-# Find the most recent year with data available
-most_recent_year = filtered_data['year'].max()
+# Define function to map integer scores to categories for social position
+def map_social_category(score):
+    if score < 2:
+        return "Very Liberal"
+    elif score < 4:
+        return "Liberal"
+    elif score < 7:
+        return "Moderate"
+    elif score < 9:
+        return "Conservative"
+    else:
+        return "Very Conservative"
 
-# Filtering data based on the most recent year
-filtered_data_year = filtered_data[filtered_data['year'] == most_recent_year]
+# 3D Scatter plot creation
+fig_3d = go.Figure(data=[go.Scatter3d(
+    x=filtered_data['v2pariglef_osp'],
+    y=filtered_data['ep_v6_lib_cons'],
+    z=filtered_data[identity_score],
+    text=[f"<b>Party:</b> {party}<br><b>Economic Position:</b> {map_economic_category(x)}<br><b>Social Position:</b> {map_social_category(y)}<br><b>{label_map[identity_score]}:</b> {z}" 
+          for party, x, y, z in zip(filtered_data['v2paenname'], filtered_data['v2pariglef_osp'], filtered_data['ep_v6_lib_cons'], filtered_data[identity_score])],  # update the text
+    hovertemplate=' %{text} <extra></extra>',  # remove X, Y, and Z labels
+    mode='markers',
+    marker=dict(
+        size=8,
+        color=[party_colors[party] for party in filtered_data['v2paenname']],  # set color to the party color from party_colors
+        colorscale='Viridis',  # choose a colorscale
+        opacity=0.8
+    )
+)])
 
-# Check if data is available for the most recent year
-if filtered_data_year.empty:
-    st.write("No data available for the most recent year.")
-else:
-    # 3D Scatter plot creation
-    fig_3d = go.Figure(data=[go.Scatter3d(
-        x=filtered_data_year['v2pariglef'],
-        y=filtered_data_year['ep_v6_lib_cons'],
-        z=filtered_data_year[identity_score],
-        text=filtered_data_year['v2paenname'],  # set text to party names
-        mode='markers',
-        marker=dict(
-            size=8,
-            color=filtered_data_year[identity_score],  # set color to the identity score
-            colorscale='Viridis',  # choose a colorscale
-            opacity=0.8
-        )
-    )])
+# Layout configuration for the 3D scatter plot
+fig_3d.update_layout(scene=dict(
+    xaxis_title='Economic Left-Right Scale',
+    yaxis_title='Social Liberalism-Conservatism Scale',
+    zaxis_title=label_map[identity_score],
+    xaxis=dict(title=dict(font=dict(size=12)), range=[6, 0]),  # reverse the range
+    yaxis=dict(title=dict(font=dict(size=12))),
+    zaxis=dict(title=dict(font=dict(size=12))),
+), 
+margin=dict(l=0, r=0, b=0, t=0))
 
-    # Layout configuration for the 3D scatter plot
-    fig_3d.update_layout(scene=dict(
-        xaxis_title='Economic Left-Right Scale',
-        yaxis_title='Social Liberalism-Conservatism Scale',
-        zaxis_title=label_map[identity_score],
-        xaxis=dict(title=dict(font=dict(size=12))),
-        yaxis=dict(title=dict(font=dict(size=12))),
-        zaxis=dict(title=dict(font=dict(size=12))),
-    ), 
-    margin=dict(l=0, r=0, b=0, t=0))
+# Configuring the frame
+fig_3d.update_layout(scene_aspectmode='cube',
+                    scene_aspectratio=dict(x=1, y=1, z=0.8))
 
-    # Configuring the frame
-    fig_3d.update_layout(scene_aspectmode='manual',
-                        scene_aspectratio=dict(x=1, y=1, z=0.8))
-
-    # Display the 3D scatter plot
-    st.plotly_chart(fig_3d)
+# Display the 3D scatter plot
+st.plotly_chart(fig_3d)

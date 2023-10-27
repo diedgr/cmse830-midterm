@@ -560,7 +560,7 @@ fig_3d.update_layout(scene_aspectmode='cube',
 # Display the 3D scatter plot
 st.plotly_chart(fig_3d)
 
-# Add subheader and introductory paragraph for graph
+# Add subheader and paragraph for intended takeaways
 st.markdown("<h2 style='padding-top: 20px;'><b>Intended Takeaways</b></h2>", unsafe_allow_html=True)
 st.write("🎓 Through the exploration of this database, users should ideally be able to:")
 st.write("- Understand how political party positions are variable, changing across time.")
